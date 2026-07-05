@@ -161,6 +161,7 @@ input,select,textarea{font-family:'Sora',sans-serif;font-size:13px;color:var(--t
       <a data-page="dashboard" class="active"><span class="ic">▦</span> Dashboard</a>
       <a data-page="employees"><span class="ic">👥</span> Employees</a>
       <a data-page="attendance"><span class="ic">🕘</span> Attendance</a>
+      <a data-page="facescan"><span class="ic">📷</span> Face Scan</a>
       <a data-page="leave"><span class="ic">🌴</span> Leave</a>
       <a data-page="payroll"><span class="ic">₹</span> Payroll</a>
       <a data-page="reports"><span class="ic">📊</span> Reports</a>
@@ -241,7 +242,7 @@ function seed(){
     employees:emps,attendance:att,leaves:leaves,payrolls:{}
   };
 }
-function load(){try{const raw=localStorage.getItem(LS_KEY);S=raw?JSON.parse(raw):seed();}catch(e){S=seed();}save();}
+function load(){try{const raw=localStorage.getItem(LS_KEY);S=raw?JSON.parse(raw):seed();}catch(e){S=seed();}if(!S.faces)S.faces={};if(!S.scanLog)S.scanLog=[];save();}
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(S));}
 function emp(id){return S.employees.find(e=>e.id===id);}
 function activeEmps(){return S.employees.filter(e=>e.status==='Active');}
@@ -273,15 +274,17 @@ function monthAttSummary(mk){
 }
 
 /* ================= NAV / SHELL ================= */
-const TITLES={dashboard:'Dashboard',employees:'Employees',attendance:'Attendance',leave:'Leave Management',payroll:'Payroll',reports:'Reports',settings:'Settings'};
+const TITLES={dashboard:'Dashboard',employees:'Employees',attendance:'Attendance',facescan:'Face Scan Attendance',leave:'Leave Management',payroll:'Payroll',reports:'Reports',settings:'Settings'};
 let PAGE='dashboard';
 function nav(p){PAGE=p;document.querySelectorAll('#sbNav a').forEach(a=>a.classList.toggle('active',a.dataset.page===p));document.getElementById('topTitle').textContent=TITLES[p];render();}
 document.getElementById('sbNav').addEventListener('click',e=>{const a=e.target.closest('a');if(a)nav(a.dataset.page);});
 function render(){
+  if(PAGE!=='facescan')fsUnmount();
   const c=document.getElementById('content');
   if(PAGE==='dashboard')c.innerHTML=vDashboard();
   else if(PAGE==='employees')c.innerHTML=vEmployees();
   else if(PAGE==='attendance')c.innerHTML=vAttendance();
+  else if(PAGE==='facescan')c.innerHTML=vFaceScan();
   else if(PAGE==='leave')c.innerHTML=vLeave();
   else if(PAGE==='payroll')c.innerHTML=vPayroll();
   else if(PAGE==='reports')c.innerHTML=vReports();
@@ -642,6 +645,192 @@ function importData(inp){
   r.readAsText(f);inp.value='';
 }
 function resetData(){if(!confirm('Erase all current data and reload sample data?'))return;S=seed();save();render();toast('Sample data restored');}
+
+/* ================= FACE SCAN ATTENDANCE ================= */
+const FS_LIB='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js';
+const FS_MODELS='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model';
+const FS_THRESHOLD=0.5, FS_COOLDOWN=60000;
+let fsReady=false,fsLoading=null,fsStream=null,fsTimer=null,fsBusy=false,fsEnrollId=null,fsSamples=[],fsLastPunch={};
+
+function vFaceScan(){
+  setTimeout(fsInitPage,0);
+  return `<div class="page-head"><div><h2>Face Scan Attendance</h2><div class="sub2">Enroll each employee's face once — then a scan marks them Present with IN/OUT time automatically</div></div>
+    <div class="toolbar"><button class="btn btn-outline" onclick="fsMarkAbsent()">Mark Unscanned as Absent</button></div></div>
+  <div class="grid-2" style="grid-template-columns:1.25fr 1fr;align-items:start">
+    <div class="card">
+      <h3>Live Camera</h3>
+      <div id="fsStatus" style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Loading face recognition engine…</div>
+      <div style="position:relative;background:#0a1628;border-radius:12px;overflow:hidden;min-height:260px">
+        <video id="fsVideo" autoplay muted playsinline style="width:100%;display:block;transform:scaleX(-1)"></video>
+        <canvas id="fsCanvas" style="position:absolute;left:0;top:0;width:100%;height:100%;transform:scaleX(-1)"></canvas>
+      </div>
+      <div id="fsBanner" style="display:none;margin-top:12px;padding:13px 16px;border-radius:10px;font-weight:600;font-size:13.5px"></div>
+      <div class="mt" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-red" onclick="fsStart()">▶ Start Camera</button>
+        <button class="btn btn-outline" onclick="fsStop()">■ Stop Camera</button>
+        <span id="fsEnrollUI" style="display:none;gap:8px;align-items:center">
+          <button class="btn btn-green" onclick="fsCapture()">📸 Capture Sample</button>
+          <button class="btn btn-outline btn-sm" onclick="fsCancelEnroll()">Cancel Enroll</button>
+        </span>
+      </div>
+      <div style="margin-top:12px;font-size:11.5px;color:var(--muted)">Tip: good lighting, one face at a time. A second scan later in the day records the OUT time. Face data stays in this browser only — nothing is uploaded anywhere.</div>
+    </div>
+    <div>
+      <div class="card"><h3>Enrolled Faces</h3>
+        <table class="tbl"><thead><tr><th>Employee</th><th>Face Data</th><th></th></tr></thead><tbody id="fsEnrollBody">${fsEnrollRows()}</tbody></table></div>
+      <div class="card mt"><h3>Today's Scans</h3><div id="fsLogWrap">${fsLogHtml()}</div></div>
+    </div>
+  </div>`;
+}
+function fsEnrollRows(){
+  return activeEmps().map(e=>{
+    const n=(S.faces[e.id]||[]).length;
+    return `<tr><td><b>${esc(e.name)}</b><br><span style="font-size:11px;color:var(--muted)">${esc(e.code)} · ${esc(e.dept)}</span></td>
+      <td>${n?`<span class="badge b-green">Enrolled · ${n}</span>`:'<span class="badge b-grey">Not enrolled</span>'}</td>
+      <td style="white-space:nowrap"><button class="btn btn-outline btn-sm" onclick="fsEnroll('${e.id}')">${n?'Re-enroll':'Enroll'}</button>${n?` <button class="btn btn-danger btn-sm" onclick="fsRemove('${e.id}')">✕</button>`:''}</td></tr>`;
+  }).join('');
+}
+function fsLogHtml(){
+  const rows=S.scanLog.filter(l=>l.date===todayStr()).map(l=>{const e=emp(l.empId);
+    return `<tr><td><b>${esc(e?e.name:'?')}</b></td><td>${l.time}</td><td>${l.action==='IN'?'<span class="badge b-green">IN · Present</span>':'<span class="badge b-blue">OUT updated</span>'}</td></tr>`;}).join('');
+  return rows?`<table class="tbl"><thead><tr><th>Employee</th><th>Time</th><th>Action</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="empty">No face scans yet today.</div>';
+}
+function fsRefresh(){const b=document.getElementById('fsEnrollBody');if(b)b.innerHTML=fsEnrollRows();const w=document.getElementById('fsLogWrap');if(w)w.innerHTML=fsLogHtml();}
+function fsSetStatus(msg,color){const el=document.getElementById('fsStatus');if(el){el.textContent=msg;el.style.color=color||'var(--muted)';}}
+function fsBanner(msg,bg,color){const b=document.getElementById('fsBanner');if(!b)return;if(!msg){b.style.display='none';return;}b.style.display='block';b.style.background=bg||'#e3f6ec';b.style.color=color||'var(--green)';b.innerHTML=msg;}
+function fsLoadLib(){
+  if(fsReady)return Promise.resolve();
+  if(fsLoading)return fsLoading;
+  fsLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');s.src=FS_LIB;
+    s.onload=async()=>{try{
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(FS_MODELS),
+        faceapi.nets.faceLandmark68Net.loadFromUri(FS_MODELS),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FS_MODELS)
+      ]);
+      fsReady=true;resolve();
+    }catch(e){fsLoading=null;reject(e);}};
+    s.onerror=()=>{fsLoading=null;reject(new Error('script load failed'));};
+    document.head.appendChild(s);
+  });
+  return fsLoading;
+}
+async function fsInitPage(){
+  try{await fsLoadLib();fsSetStatus('Engine ready ✓ — click "Start Camera", then look straight at the camera.');}
+  catch(e){fsSetStatus('⚠ Could not load the face engine — check your internet connection and reopen this page.','var(--red)');}
+}
+async function fsStart(){
+  if(fsStream)return;
+  try{await fsLoadLib();}catch(e){toast('Face engine failed to load — check internet');return;}
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:640}},audio:false});}
+  catch(e){fsSetStatus('⚠ Camera blocked. Click the camera icon in the browser address bar, allow access, then try again.','var(--red)');return;}
+  const v=document.getElementById('fsVideo');
+  if(!v){stream.getTracks().forEach(t=>t.stop());return;}
+  fsStream=stream;v.srcObject=stream;
+  v.onloadedmetadata=()=>{const c=document.getElementById('fsCanvas');if(c){c.width=v.videoWidth;c.height=v.videoHeight;}};
+  fsSetStatus('Scanning… stand one at a time in front of the camera.');
+  fsTimer=setInterval(fsTick,900);
+}
+function fsStop(silent){
+  if(fsTimer){clearInterval(fsTimer);fsTimer=null;}
+  if(fsStream){fsStream.getTracks().forEach(t=>t.stop());fsStream=null;}
+  const v=document.getElementById('fsVideo');if(v)v.srcObject=null;
+  fsEnrollId=null;fsSamples=[];
+  const ui=document.getElementById('fsEnrollUI');if(ui)ui.style.display='none';
+  if(silent!==true){fsSetStatus('Camera stopped.');fsBanner('');}
+}
+function fsUnmount(){if(fsStream||fsTimer)fsStop(true);}
+function fsDetOpts(){return new faceapi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:0.5});}
+function fsDrawBox(det){
+  const c=document.getElementById('fsCanvas');if(!c)return;const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  if(det){const b=det.detection.box;ctx.strokeStyle='#e8460a';ctx.lineWidth=3;ctx.strokeRect(b.x,b.y,b.width,b.height);}
+}
+function fsMatch(desc){
+  let best=null,bestD=1e9;
+  Object.keys(S.faces).forEach(id=>{
+    (S.faces[id]||[]).forEach(s=>{const d=faceapi.euclideanDistance(desc,new Float32Array(s));if(d<bestD){bestD=d;best=id;}});
+  });
+  return bestD<=FS_THRESHOLD&&emp(best)?{empId:best,dist:bestD}:null;
+}
+function fsPunch(empId){
+  const tk=todayStr(),d=new Date();
+  const hhmm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+  if(!S.attendance[tk])S.attendance[tk]={};
+  const rec=S.attendance[tk][empId];
+  let action;
+  if(!rec||rec.status==='A'||!rec.in){S.attendance[tk][empId]={status:'P',in:hhmm};action='IN';}
+  else{rec.out=hhmm;if(rec.status==='A')rec.status='P';action='OUT';}
+  S.scanLog.unshift({empId,date:tk,time:hhmm,action});
+  if(S.scanLog.length>300)S.scanLog.length=300;
+  save();
+  return {action,time:hhmm};
+}
+async function fsTick(){
+  if(fsBusy||!fsStream)return;fsBusy=true;
+  try{
+    const v=document.getElementById('fsVideo');
+    if(!v||v.readyState<2){fsBusy=false;return;}
+    const det=await faceapi.detectSingleFace(v,fsDetOpts()).withFaceLandmarks().withFaceDescriptor();
+    fsDrawBox(det);
+    if(fsEnrollId||!det){fsBusy=false;return;}
+    const m=fsMatch(det.descriptor);
+    if(!m){fsBanner('🙂 Face detected — not recognized. Enroll this person from the list on the right.','#fdf3e0','var(--amber)');fsBusy=false;return;}
+    const e=emp(m.empId);
+    if(Date.now()-(fsLastPunch[m.empId]||0)<FS_COOLDOWN){fsBanner('✔ '+esc(e.name)+' — already recorded. Scan again after a minute to update OUT time.','#e8eefb','var(--blue)');fsBusy=false;return;}
+    fsLastPunch[m.empId]=Date.now();
+    const r=fsPunch(m.empId);
+    fsBanner(r.action==='IN'
+      ?'✅ <b>'+esc(e.name)+'</b> marked <b>PRESENT</b> — IN '+r.time
+      :'🕘 <b>'+esc(e.name)+'</b> — OUT time updated to '+r.time,'#e3f6ec','var(--green)');
+    fsRefresh();
+  }catch(e){}
+  fsBusy=false;
+}
+function fsEnroll(id){
+  const e=emp(id);if(!e)return;
+  fsEnrollId=id;fsSamples=[];
+  const ui=document.getElementById('fsEnrollUI');if(ui)ui.style.display='inline-flex';
+  fsBanner('📸 Enrolling <b>'+esc(e.name)+'</b> — captured 0 / 3. Look straight at the camera and click "Capture Sample".','#e8eefb','var(--blue)');
+  if(!fsStream)fsStart();
+}
+function fsCancelEnroll(){fsEnrollId=null;fsSamples=[];const ui=document.getElementById('fsEnrollUI');if(ui)ui.style.display='none';fsBanner('');}
+async function fsCapture(){
+  if(!fsEnrollId){toast('Click Enroll next to an employee first');return;}
+  if(!fsStream){toast('Start the camera first');return;}
+  const v=document.getElementById('fsVideo');
+  const e=emp(fsEnrollId);
+  fsBanner('⏳ Capturing…','#e8eefb','var(--blue)');
+  const det=await faceapi.detectSingleFace(v,fsDetOpts()).withFaceLandmarks().withFaceDescriptor();
+  if(!det){fsBanner('⚠ No clear face found — move closer, face the camera, and try again.','#fdeae9','var(--red)');return;}
+  fsSamples.push(Array.from(det.descriptor));
+  if(fsSamples.length>=3){
+    S.faces[fsEnrollId]=fsSamples;save();
+    const name=e?e.name:'Employee';
+    fsEnrollId=null;fsSamples=[];
+    const ui=document.getElementById('fsEnrollUI');if(ui)ui.style.display='none';
+    fsBanner('✅ <b>'+esc(name)+'</b> enrolled successfully. They can now scan to mark attendance.','#e3f6ec','var(--green)');
+    fsRefresh();toast(name+' enrolled');
+  }else{
+    fsBanner('📸 Enrolling <b>'+esc(e.name)+'</b> — captured '+fsSamples.length+' / 3. Turn your head slightly and capture again.','#e8eefb','var(--blue)');
+  }
+}
+function fsRemove(id){
+  const e=emp(id);
+  if(!confirm('Remove face data for '+(e?e.name:'this employee')+'?'))return;
+  delete S.faces[id];save();fsRefresh();toast('Face data removed');
+}
+function fsMarkAbsent(){
+  const tk=todayStr();
+  const day=S.attendance[tk]||(S.attendance[tk]={});
+  const un=activeEmps().filter(e=>!day[e.id]);
+  if(!un.length){toast('Everyone already has a status for today');return;}
+  if(!confirm('Mark '+un.length+' employee(s) with no scan today as ABSENT?'))return;
+  un.forEach(e=>day[e.id]={status:'A'});
+  save();fsRefresh();toast(un.length+' marked absent');
+}
 
 /* ================= INIT ================= */
 load();
