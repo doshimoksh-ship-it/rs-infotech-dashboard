@@ -127,6 +127,35 @@ input,select,textarea{font-family:'Sora',sans-serif;font-size:13px;color:var(--t
 .ps-tbl .tot td{font-weight:700;color:var(--navy);border-top:1.5px solid var(--border)}
 .ps-net{margin-top:16px;background:#e3f6ec;border-radius:10px;padding:13px 16px;display:flex;justify-content:space-between;font-weight:700;color:var(--green);font-size:15px}
 
+/* community app */
+.cm-wrap{max-width:430px;margin:0 auto;background:#e9ebf0;border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(10,22,40,.18);display:flex;flex-direction:column;height:calc(100vh - 150px);min-height:540px}
+.cm-head{background:#3b5b92;color:#fff;padding:13px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.cm-head .cm-ic{font-size:20px;cursor:pointer;user-select:none}
+.cm-head h4{flex:1;font-size:16.5px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cm-search-row{background:#3b5b92;padding:0 12px 10px}
+.cm-search-row input{width:100%;padding:9px 12px;border:none;border-radius:8px;outline:none;font-size:13px}
+.cm-chips{display:flex;gap:8px;padding:10px 12px;background:#fff;overflow-x:auto;border-bottom:1px solid var(--border);flex-shrink:0}
+.cm-chip{padding:7px 18px;border:1.5px solid #9aa4b5;border-radius:22px;background:#fff;font-size:13.5px;font-weight:600;cursor:pointer;white-space:nowrap;color:#2c3547}
+.cm-chip.on{background:#3b5b92;color:#fff;border-color:#3b5b92}
+.cm-body{flex:1;overflow-y:auto;padding:10px}
+.cm-card{background:#fff;border-radius:12px;padding:13px 14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.cm-prompt{display:flex;align-items:center;gap:11px;cursor:pointer}
+.cm-prompt .pt{flex:1;font-size:15px;font-weight:700;color:#1e2a3a}
+.cm-post-top{display:flex;align-items:flex-start;gap:8px}
+.cm-post-top .t{flex:1;font-size:14.5px;font-weight:700;color:#1e2a3a}
+.cm-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.cm-post-body{font-size:13px;color:#333c4d;margin-top:8px;white-space:pre-wrap;word-break:break-word}
+.cm-act{font-size:15px;cursor:pointer;color:#2c66d9;user-select:none}
+.cm-nav{display:flex;background:#fff;border-top:1px solid var(--border);flex-shrink:0}
+.cm-nav a{flex:1;text-align:center;padding:8px 2px 10px;font-size:10.5px;color:#8a93a3;cursor:pointer}
+.cm-nav a .nic{display:block;font-size:19px;margin-bottom:1px}
+.cm-nav a.on{color:#2c66d9;font-weight:700}
+.cm-bubble{max-width:78%;padding:9px 12px;border-radius:14px;margin-bottom:8px;font-size:13px;word-break:break-word}
+.cm-bubble.me{background:#3b5b92;color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+.cm-bubble.them{background:#fff;border-bottom-left-radius:4px}
+.cm-bubble .bt{font-size:10px;opacity:.65;margin-top:3px;text-align:right}
+.cm-sendrow{display:flex;gap:8px;padding:10px;background:#fff;border-top:1px solid var(--border);flex-shrink:0}
+.cm-sendrow input{flex:1;padding:10px 13px;border:1.5px solid var(--border);border-radius:22px;outline:none}
 @media print{
   body *{visibility:hidden}
   #payslipPrint,#payslipPrint *{visibility:visible}
@@ -163,6 +192,7 @@ input,select,textarea{font-family:'Sora',sans-serif;font-size:13px;color:var(--t
       <a data-page="attendance"><span class="ic">🕘</span> Attendance</a>
       <a data-page="facescan"><span class="ic">📷</span> Face Scan</a>
       <a data-page="leave"><span class="ic">🌴</span> Leave</a>
+      <a data-page="community"><span class="ic">📱</span> Community</a>
       <a data-page="payroll"><span class="ic">₹</span> Payroll</a>
       <a data-page="reports"><span class="ic">📊</span> Reports</a>
       <a data-page="settings"><span class="ic">⚙</span> Settings</a>
@@ -242,7 +272,7 @@ function seed(){
     employees:emps,attendance:att,leaves:leaves,payrolls:{}
   };
 }
-function load(){try{const raw=localStorage.getItem(LS_KEY);S=raw?JSON.parse(raw):seed();}catch(e){S=seed();}if(!S.faces)S.faces={};if(!S.scanLog)S.scanLog=[];save();}
+function load(){try{const raw=localStorage.getItem(LS_KEY);S=raw?JSON.parse(raw):seed();}catch(e){S=seed();}if(!S.faces)S.faces={};if(!S.scanLog)S.scanLog=[];if(!S.community)S.community=cmSeed();save();}
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(S));}
 function emp(id){return S.employees.find(e=>e.id===id);}
 function activeEmps(){return S.employees.filter(e=>e.status==='Active');}
@@ -274,7 +304,7 @@ function monthAttSummary(mk){
 }
 
 /* ================= NAV / SHELL ================= */
-const TITLES={dashboard:'Dashboard',employees:'Employees',attendance:'Attendance',facescan:'Face Scan Attendance',leave:'Leave Management',payroll:'Payroll',reports:'Reports',settings:'Settings'};
+const TITLES={dashboard:'Dashboard',employees:'Employees',attendance:'Attendance',facescan:'Face Scan Attendance',leave:'Leave Management',community:'Community App',payroll:'Payroll',reports:'Reports',settings:'Settings'};
 let PAGE='dashboard';
 function nav(p){PAGE=p;document.querySelectorAll('#sbNav a').forEach(a=>a.classList.toggle('active',a.dataset.page===p));document.getElementById('topTitle').textContent=TITLES[p];render();}
 document.getElementById('sbNav').addEventListener('click',e=>{const a=e.target.closest('a');if(a)nav(a.dataset.page);});
@@ -286,6 +316,7 @@ function render(){
   else if(PAGE==='attendance')c.innerHTML=vAttendance();
   else if(PAGE==='facescan')c.innerHTML=vFaceScan();
   else if(PAGE==='leave')c.innerHTML=vLeave();
+  else if(PAGE==='community')c.innerHTML=vCommunity();
   else if(PAGE==='payroll')c.innerHTML=vPayroll();
   else if(PAGE==='reports')c.innerHTML=vReports();
   else if(PAGE==='settings')c.innerHTML=vSettings();
@@ -645,6 +676,142 @@ function importData(inp){
   r.readAsText(f);inp.value='';
 }
 function resetData(){if(!confirm('Erase all current data and reload sample data?'))return;S=seed();save();render();toast('Sample data restored');}
+
+/* ================= COMMUNITY APP ================= */
+const CM_CATS=['All','CT','Job','Property','Commerce'];
+let cmTab='inbox',cmCat='All',cmSearch='',cmSearchOpen=false,cmChatId=null;
+
+function nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function cmSeed(){
+  return {
+    posts:[
+      {id:uid(),cat:'CT',title:'Community meeting this Sunday',body:'Monthly community gathering at the hall, 10 AM. All members requested to attend.',by:'Admin',date:todayStr(),time:'09:15'},
+      {id:uid(),cat:'Job',title:'Accountant required — Alkapuri firm',body:'B.Com with 2+ years experience in Tally. Contact 98250 11002.',by:'Admin',date:todayStr(),time:'08:40'},
+      {id:uid(),cat:'Property',title:'2BHK flat for sale — Manjalpur',body:'980 sq.ft, 3rd floor, ready possession. Serious buyers only.',by:'Admin',date:todayStr(),time:'08:05'},
+      {id:uid(),cat:'Commerce',title:'Shop space available near Mandvi',body:'250 sq.ft ground floor shop, suitable for retail. Reasonable rent.',by:'Admin',date:todayStr(),time:'07:50'}
+    ],
+    profiles:[
+      {id:uid(),name:'Jinal S.',age:27,city:'Vadodara',about:'M.Com, working in a private bank. Family business background.'},
+      {id:uid(),name:'Harsh M.',age:29,city:'Ahmedabad',about:'CA, own practice. Looking for an educated match.'}
+    ],
+    chats:[
+      {id:uid(),name:'Community Admin',msgs:[{from:'them',text:'Jai Jinendra! Welcome to the community app. 🙏',t:'10:30'}]},
+      {id:uid(),name:'Events Group',msgs:[{from:'them',text:'Sunday meeting agenda has been posted in CT.',t:'09:20'}]}
+    ]
+  };
+}
+function vCommunity(){
+  const C=S.community;
+  let body='',chips='',sendRow='';
+  if(cmTab==='inbox'||cmTab==='myfeed'){
+    chips=`<div class="cm-chips">${CM_CATS.map(c=>`<span class="cm-chip ${cmCat===c?'on':''}" onclick="cmCat='${c}';render()">${c}</span>`).join('')}</div>`;
+    let posts=C.posts.filter(p=>(cmCat==='All'||p.cat===cmCat)&&(cmTab!=='myfeed'||p.by==='You'));
+    if(cmSearch)posts=posts.filter(p=>(p.title+' '+p.body).toLowerCase().includes(cmSearch.toLowerCase()));
+    const prompt=cmTab==='inbox'?`<div class="cm-card cm-prompt" onclick="cmCompose('CT','Medical Message')"><span style="font-size:26px">⚕️</span><span class="pt">Post Medical Message in CT</span><span class="cm-act" onclick="event.stopPropagation();cmCompose('CT','Medical Message')">✏️</span></div>`:'';
+    const list=posts.map(p=>`<div class="cm-card">
+      <div class="cm-post-top"><div class="t">${esc(p.title)}<div class="cm-meta"><span class="badge b-blue">${esc(p.cat)}</span> &nbsp;${esc(p.by)} · ${fmtDate(p.date)} ${p.time}</div></div>
+      <span class="cm-act" title="Edit" onclick="cmPostForm('${p.id}')">✏️</span><span class="cm-act" title="Delete" style="color:var(--red)" onclick="cmDeletePost('${p.id}')">✕</span></div>
+      ${p.body?`<div class="cm-post-body">${esc(p.body)}</div>`:''}
+    </div>`).join('');
+    body=prompt+(list||'<div class="empty">'+(cmTab==='myfeed'?'You haven\'t posted anything yet — use New Message.':'No posts in this category yet.')+'</div>');
+  }else if(cmTab==='matrimony'){
+    body=`<div class="cm-card" style="display:flex;justify-content:space-between;align-items:center"><b>Matrimony Profiles (${C.profiles.length})</b><button class="btn btn-red btn-sm" onclick="cmProfileForm()">＋ Add Profile</button></div>`+
+      (C.profiles.map(p=>`<div class="cm-card">
+        <div class="cm-post-top"><div class="t">💗 ${esc(p.name)}, ${p.age}<div class="cm-meta">${esc(p.city)}</div></div>
+        <span class="cm-act" onclick="cmProfileForm('${p.id}')">✏️</span><span class="cm-act" style="color:var(--red)" onclick="cmDeleteProfile('${p.id}')">✕</span></div>
+        <div class="cm-post-body">${esc(p.about)}</div>
+      </div>`).join('')||'<div class="empty">No profiles yet.</div>');
+  }else if(cmTab==='new'){
+    body=`<div class="cm-card">
+      <b style="font-size:15px">New Message</b>
+      <div class="fg" style="margin-top:12px"><label>Category</label><select id="cm_cat">${CM_CATS.slice(1).map(c=>`<option>${c}</option>`).join('')}</select></div>
+      <div class="fg"><label>Title</label><input id="cm_title" placeholder="What is this about?"></div>
+      <div class="fg"><label>Message</label><textarea id="cm_body" rows="5" placeholder="Write your message…"></textarea></div>
+      <button class="btn btn-red" style="width:100%" onclick="cmPost()">Post Message</button>
+    </div>`;
+  }else if(cmTab==='chats'){
+    if(cmChatId){
+      const ch=C.chats.find(x=>x.id===cmChatId);
+      if(ch){
+        body=`<div style="display:flex;flex-direction:column;min-height:100%">
+          <div class="cm-card" style="display:flex;align-items:center;gap:10px;position:sticky;top:0"><span class="cm-act" onclick="cmChatId=null;render()" style="font-size:18px">‹</span><b>${esc(ch.name)}</b></div>
+          <div style="display:flex;flex-direction:column">${ch.msgs.map(m=>`<div class="cm-bubble ${m.from==='me'?'me':'them'}">${esc(m.text)}<div class="bt">${m.t}</div></div>`).join('')}</div>
+        </div>`;
+        sendRow=`<div class="cm-sendrow"><input id="cmMsgInp" placeholder="Type a message…" onkeydown="if(event.key==='Enter')cmSend()"><button class="btn btn-red" onclick="cmSend()">Send</button></div>`;
+      }else{cmChatId=null;}
+    }
+    if(!cmChatId&&!body){
+      body=C.chats.map(ch=>{const last=ch.msgs[ch.msgs.length-1];
+        return `<div class="cm-card cm-prompt" onclick="cmChatId='${ch.id}';render()"><span style="font-size:24px">💬</span><span class="pt">${esc(ch.name)}<div class="cm-meta">${esc(last?last.text.slice(0,42):'')}</div></span><span class="cm-meta">${last?last.t:''}</span></div>`;}).join('')
+        +`<div class="cm-card cm-prompt" onclick="cmNewChat()"><span style="font-size:24px">➕</span><span class="pt">Start new chat</span></div>`;
+    }
+  }
+  const NAVS=[['inbox','📥','Inbox'],['matrimony','🤍','Matrimony'],['new','✉️','New Message'],['chats','💬','Chats'],['myfeed','👤','My Feed']];
+  return `<div class="cm-wrap">
+    <div class="cm-head"><span class="cm-ic" onclick="toast('Menu — demo')">☰</span><h4>Ghoghari Visa Shrimali Jain</h4><span class="cm-ic" onclick="cmSearchOpen=!cmSearchOpen;render()">🔍</span></div>
+    ${cmSearchOpen?`<div class="cm-search-row"><input placeholder="Search posts…" value="${esc(cmSearch)}" oninput="cmSearch=this.value;render();const i=document.querySelector('.cm-search-row input');i.focus();i.setSelectionRange(999,999)"></div>`:''}
+    ${chips}
+    <div class="cm-body" id="cmBody">${body}</div>
+    ${sendRow}
+    <div class="cm-nav">${NAVS.map(n=>`<a class="${cmTab===n[0]?'on':''}" onclick="cmTab='${n[0]}';${n[0]!=='chats'?'cmChatId=null;':''}render()"><span class="nic">${n[1]}</span>${n[2]}</a>`).join('')}</div>
+  </div>`;
+}
+function cmCompose(cat,hint){cmTab='new';render();const s=document.getElementById('cm_cat');if(s)s.value=cat;const t=document.getElementById('cm_title');if(t&&hint){t.value=hint+': ';t.focus();}}
+function cmPost(){
+  const cat=document.getElementById('cm_cat').value,title=document.getElementById('cm_title').value.trim(),bodyTxt=document.getElementById('cm_body').value.trim();
+  if(!title){toast('Please enter a title');return;}
+  S.community.posts.unshift({id:uid(),cat,title,body:bodyTxt,by:'You',date:todayStr(),time:nowHM()});
+  save();cmTab='inbox';cmCat='All';render();toast('Message posted');
+}
+function cmPostForm(id){
+  const p=S.community.posts.find(x=>x.id===id);if(!p)return;
+  openModal(`<h3>Edit Post</h3>
+  <div class="fg"><label>Category</label><select id="ce_cat">${CM_CATS.slice(1).map(c=>`<option ${p.cat===c?'selected':''}>${c}</option>`).join('')}</select></div>
+  <div class="fg"><label>Title</label><input id="ce_title" value="${esc(p.title)}"></div>
+  <div class="fg"><label>Message</label><textarea id="ce_body" rows="4">${esc(p.body)}</textarea></div>
+  <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-red" onclick="cmPostSave('${id}')">Save</button></div>`);
+}
+function cmPostSave(id){
+  const p=S.community.posts.find(x=>x.id===id);if(!p)return;
+  p.cat=document.getElementById('ce_cat').value;p.title=document.getElementById('ce_title').value.trim();p.body=document.getElementById('ce_body').value.trim();
+  save();closeModal();render();toast('Post updated');
+}
+function cmDeletePost(id){
+  if(!confirm('Delete this post?'))return;
+  S.community.posts=S.community.posts.filter(x=>x.id!==id);save();render();toast('Post deleted');
+}
+function cmProfileForm(id){
+  const p=id?S.community.profiles.find(x=>x.id===id):{name:'',age:'',city:'',about:''};if(id&&!p)return;
+  openModal(`<h3>${id?'Edit':'Add'} Matrimony Profile</h3>
+  <div class="f-row"><div class="fg"><label>Name</label><input id="cp_name" value="${esc(p.name)}"></div><div class="fg"><label>Age</label><input id="cp_age" type="number" value="${p.age}"></div></div>
+  <div class="fg"><label>City</label><input id="cp_city" value="${esc(p.city)}"></div>
+  <div class="fg"><label>About</label><textarea id="cp_about" rows="3">${esc(p.about)}</textarea></div>
+  <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-red" onclick="cmProfileSave('${id||''}')">Save</button></div>`);
+}
+function cmProfileSave(id){
+  const g=x=>document.getElementById('cp_'+x).value;
+  if(!g('name').trim()){toast('Name is required');return;}
+  const data={name:g('name').trim(),age:+g('age')||'',city:g('city'),about:g('about')};
+  if(id){Object.assign(S.community.profiles.find(x=>x.id===id),data);}else{S.community.profiles.push({id:uid(),...data});}
+  save();closeModal();render();toast(id?'Profile updated':'Profile added');
+}
+function cmDeleteProfile(id){
+  if(!confirm('Delete this profile?'))return;
+  S.community.profiles=S.community.profiles.filter(x=>x.id!==id);save();render();toast('Profile deleted');
+}
+function cmNewChat(){
+  const name=prompt('Chat with (name):');if(!name||!name.trim())return;
+  const ch={id:uid(),name:name.trim(),msgs:[]};
+  S.community.chats.push(ch);save();cmChatId=ch.id;render();
+}
+function cmSend(){
+  const inp=document.getElementById('cmMsgInp');if(!inp||!inp.value.trim())return;
+  const ch=S.community.chats.find(x=>x.id===cmChatId);if(!ch)return;
+  ch.msgs.push({from:'me',text:inp.value.trim(),t:nowHM()});
+  save();render();
+  const b=document.getElementById('cmBody');if(b)b.scrollTop=b.scrollHeight;
+  const ni=document.getElementById('cmMsgInp');if(ni)ni.focus();
+}
 
 /* ================= FACE SCAN ATTENDANCE ================= */
 const FS_LIB='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js';
