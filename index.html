@@ -127,6 +127,20 @@ input,select,textarea{font-family:'Sora',sans-serif;font-size:13px;color:var(--t
 .ps-tbl .tot td{font-weight:700;color:var(--navy);border-top:1.5px solid var(--border)}
 .ps-net{margin-top:16px;background:#e3f6ec;border-radius:10px;padding:13px 16px;display:flex;justify-content:space-between;font-weight:700;color:var(--green);font-size:15px}
 
+/* hr home & hr dashboard */
+.tbl-scroll{overflow-x:auto}
+.hr-badge{position:relative;cursor:pointer}
+.hr-badge sup{font-size:9px;color:#fff;background:var(--accent);border-radius:8px;padding:1px 5px;position:absolute;top:-7px;right:-10px;font-weight:700}
+.hh-req{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:13px;color:var(--blue);font-weight:600}
+.hh-req b{color:#fff;border-radius:6px;padding:2px 10px;font-size:11px}
+.hh-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.hh-cell{min-height:54px;border:1px solid var(--light);border-radius:8px;padding:4px;font-size:11px}
+.hh-cell .dn{text-align:right;color:var(--muted)}
+.hh-cell.today{border:2px solid var(--blue)}
+.hh-mark{display:inline-block;color:#fff;border-radius:5px;padding:2px 6px;font-size:9.5px;font-weight:700}
+.hr-tab{cursor:pointer;font-weight:700;padding:6px 2px;border-top:3px solid transparent;color:var(--muted)}
+.hr-tab.on{border-top-color:var(--blue);color:var(--blue)}
+
 /* community app */
 .cm-wrap{max-width:430px;margin:0 auto;background:#e9ebf0;border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(10,22,40,.18);display:flex;flex-direction:column;height:calc(100vh - 150px);min-height:540px}
 .cm-head{background:#3b5b92;color:#fff;padding:13px 14px;display:flex;align-items:center;gap:12px;flex-shrink:0}
@@ -188,6 +202,8 @@ input,select,textarea{font-family:'Sora',sans-serif;font-size:13px;color:var(--t
     <div class="sb-logo"><div class="logo-icon">RS</div><div class="sb-logo-text">R.S. Infotech<span>HRMS · Payroll</span></div></div>
     <nav class="sb-nav" id="sbNav">
       <a data-page="dashboard" class="active"><span class="ic">▦</span> Dashboard</a>
+      <a data-page="hrhome"><span class="ic">🏠</span> HR Home</a>
+      <a data-page="hrdash"><span class="ic">📈</span> HR Dashboard</a>
       <a data-page="employees"><span class="ic">👥</span> Employees</a>
       <a data-page="attendance"><span class="ic">🕘</span> Attendance</a>
       <a data-page="facescan"><span class="ic">📷</span> Face Scan</a>
@@ -221,6 +237,7 @@ input,select,textarea{font-family:'Sora',sans-serif;font-size:13px;color:var(--t
 /* ================= STATE ================= */
 const LS_KEY='rsinfotech_hrms_v1';
 const DEPTS=['Sales','Service','Technical','Accounts','Admin'];
+const SHIFTS=['9:30AM to 7:00PM','RE 10 am to 7:30pm','RE 3pm to 12am','RE 8am to 4pm','RE 8am to 7:30pm','WFH 10 am to 6pm','WFH 11:30 am to 7pm'];
 const LEAVE_TYPES=['Casual Leave','Sick Leave','Earned Leave','Leave Without Pay'];
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 let S=null;
@@ -272,7 +289,10 @@ function seed(){
     employees:emps,attendance:att,leaves:leaves,payrolls:{}
   };
 }
-function load(){try{const raw=localStorage.getItem(LS_KEY);S=raw?JSON.parse(raw):seed();}catch(e){S=seed();}if(!S.faces)S.faces={};if(!S.scanLog)S.scanLog=[];if(!S.community)S.community=cmSeed();save();}
+function load(){try{const raw=localStorage.getItem(LS_KEY);S=raw?JSON.parse(raw):seed();}catch(e){S=seed();}if(!S.faces)S.faces={};if(!S.scanLog)S.scanLog=[];if(!S.community)S.community=cmSeed();
+if(!S.expenses)S.expenses=[];if(!S.overtime)S.overtime=[];if(!S.visits)S.visits=[];
+S.employees.forEach((e,i)=>{if(!e.shift)e.shift=SHIFTS[[0,0,5,0,1,0,6,0][i%8]];if(e.bio===undefined)e.bio='';});
+save();}
 function save(){localStorage.setItem(LS_KEY,JSON.stringify(S));}
 function emp(id){return S.employees.find(e=>e.id===id);}
 function activeEmps(){return S.employees.filter(e=>e.status==='Active');}
@@ -304,7 +324,7 @@ function monthAttSummary(mk){
 }
 
 /* ================= NAV / SHELL ================= */
-const TITLES={dashboard:'Dashboard',employees:'Employees',attendance:'Attendance',facescan:'Face Scan Attendance',leave:'Leave Management',community:'Community App',payroll:'Payroll',reports:'Reports',settings:'Settings'};
+const TITLES={dashboard:'Dashboard',hrhome:'Home',hrdash:'HR Dashboard',employees:'Employees',attendance:'Attendance',facescan:'Face Scan Attendance',leave:'Leave Management',community:'Community App',payroll:'Payroll',reports:'Reports',settings:'Settings'};
 let PAGE='dashboard';
 function nav(p){PAGE=p;document.querySelectorAll('#sbNav a').forEach(a=>a.classList.toggle('active',a.dataset.page===p));document.getElementById('topTitle').textContent=TITLES[p];render();}
 document.getElementById('sbNav').addEventListener('click',e=>{const a=e.target.closest('a');if(a)nav(a.dataset.page);});
@@ -312,6 +332,8 @@ function render(){
   if(PAGE!=='facescan')fsUnmount();
   const c=document.getElementById('content');
   if(PAGE==='dashboard')c.innerHTML=vDashboard();
+  else if(PAGE==='hrhome')c.innerHTML=vHrHome();
+  else if(PAGE==='hrdash')c.innerHTML=vHrDash();
   else if(PAGE==='employees')c.innerHTML=vEmployees();
   else if(PAGE==='attendance')c.innerHTML=vAttendance();
   else if(PAGE==='facescan')c.innerHTML=vFaceScan();
@@ -676,6 +698,301 @@ function importData(inp){
   r.readAsText(f);inp.value='';
 }
 function resetData(){if(!confirm('Erase all current data and reload sample data?'))return;S=seed();save();render();toast('Sample data restored');}
+
+/* ================= HR HOME (Tankhwapatra style) ================= */
+let hhTeamTab='imm',hhTeamSearch='',hhTeamDate=todayStr(),hhCalY=new Date().getFullYear(),hhCalM=new Date().getMonth(),hhBday='today',hhAnn='today',hhShiftDate=todayStr();
+function initials(n){return (n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();}
+function fmtDMY(s){if(!s)return'—';const[y,m,d]=s.split('-');return d+'-'+m+'-'+y;}
+function hrFull(){if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen();}
+function hrIcons(){
+  return `<div style="display:flex;gap:16px;align-items:center;font-size:17px">
+    <a href="https://wa.me/" target="_blank" title="WhatsApp" style="text-decoration:none">💚</a>
+    <span class="hr-badge" title="Chats" onclick="cmTab='chats';nav('community')">💬<sup>0</sup></span>
+    <span class="hr-badge" title="Approvals" onclick="nav('leave')">🧑‍💼<sup>0</sup></span>
+    <span class="hr-badge" title="Mail" onclick="toast('Mailbox — demo')">✉️<sup style="background:#f5a623">57</sup></span>
+    <span class="hr-badge" title="Notifications" onclick="toast('No new notifications')">🔔<sup>0</sup></span>
+    <span style="cursor:pointer" title="Theme" onclick="toast('Theme toggle — demo')">🌓</span>
+    <span style="cursor:pointer" title="Fullscreen" onclick="hrFull()">⛶</span>
+    <span style="cursor:pointer" title="Apps" onclick="toast('App launcher — demo')">▦</span>
+    <div class="avatar" style="width:32px;height:32px;font-size:11px">JD</div>
+  </div>`;
+}
+function hrTabs(active){
+  return `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;gap:26px">
+      <a class="hr-tab ${active==='home'?'on':''}" onclick="nav('hrhome')">Home</a>
+      <a class="hr-tab ${active==='dash'?'on':''}" onclick="nav('hrdash')">Hr DashBoard</a>
+    </div>${hrIcons()}</div>`;
+}
+function hhPunchCard(){
+  const me=S.employees[0];if(!me)return'';
+  const rec=(S.attendance[todayStr()]||{})[me.id];
+  const badge=rec&&rec.out?'<span class="badge b-red" style="font-size:12px;padding:6px 16px">Punched-Out</span>':rec&&rec.in?'<span class="badge b-green" style="font-size:12px;padding:6px 16px">Punched-In</span>':'<span class="badge b-grey" style="font-size:12px;padding:6px 16px">Not Punched-In</span>';
+  const lbl=(!rec||!rec.in)?'Punch In ›':'Punch Out ›';
+  return `<div class="card" style="max-width:880px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div style="font-size:12px;color:var(--muted)">Address</div>${badge}</div>
+    <div style="font-weight:700;color:var(--blue);font-size:16px;margin:6px 0 18px">Lalbagh Road Lalbaug, ${esc(S.company.address||'Vadodara, Gujarat')}, India 390011</div>
+    <div style="display:flex;gap:70px;align-items:flex-end;flex-wrap:wrap">
+      <div><div style="font-size:12px;color:var(--muted)">Date</div><b style="font-size:17px;color:var(--navy)">${fmtDMY(todayStr())}</b></div>
+      <div><div style="font-size:12px;color:var(--muted)">Time</div><b style="font-size:17px;color:var(--navy)" id="hhClock">${new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit'})}</b></div>
+      <button class="btn" style="background:var(--blue);color:#fff;border-radius:26px;padding:13px 30px;font-size:14px;margin-left:auto" onclick="hrPunch()">${lbl}</button>
+    </div></div>`;
+}
+function hrPunch(){
+  const me=S.employees[0],tk=todayStr(),hm=nowHM();
+  if(!S.attendance[tk])S.attendance[tk]={};
+  const rec=S.attendance[tk][me.id];
+  if(!rec||!rec.in){S.attendance[tk][me.id]={status:'P',in:hm};toast('Punched In at '+hm);}
+  else{rec.out=hm;if(rec.status==='A')rec.status='P';toast('Punched Out at '+hm);}
+  save();render();
+}
+function hhReqCard(kind,arr){
+  const n=s=>arr.filter(x=>x.status===s).length;
+  const click=kind==='Leave'?"nav('leave')":"hrReqModal('"+kind+"')";
+  return `<div style="border:1px solid var(--border);border-radius:12px;padding:14px;cursor:pointer" onclick="${click}">
+    <div style="text-align:center;font-weight:700;margin-bottom:12px">${kind}</div>
+    <div class="hh-req"><span>Approve</span><b style="background:var(--green)">${n('Approved')}</b></div>
+    <div class="hh-req"><span>Pending</span><b style="background:#b99b2e">${n('Pending')}</b></div>
+    <div class="hh-req"><span>Rejected</span><b style="background:var(--red)">${n('Rejected')}</b></div>
+  </div>`;
+}
+function hrReqModal(kind){
+  const arr=kind==='Expense'?S.expenses:S.overtime;
+  const rows=arr.map(r=>{const e=emp(r.empId);
+    return `<tr><td><b>${esc(e?e.name:'?')}</b></td><td>${fmtDate(r.date)}</td><td>${kind==='Expense'?fmtMoney(+r.amount||0):(r.hours+' hrs')}</td><td>${esc(r.desc||r.reason||'')}</td>
+    <td><span class="badge ${r.status==='Approved'?'b-green':r.status==='Rejected'?'b-red':'b-amber'}">${r.status}</span></td>
+    <td style="white-space:nowrap">${r.status==='Pending'?`<button class="btn btn-green btn-sm" onclick="hrReqAct('${kind}','${r.id}','Approved')">Approve</button> <button class="btn btn-danger btn-sm" onclick="hrReqAct('${kind}','${r.id}','Rejected')">Reject</button>`:''}</td></tr>`;}).join('');
+  openModal(`<h3>${kind} Requests</h3>
+  ${arr.length?`<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Employee</th><th>Date</th><th>${kind==='Expense'?'Amount':'Hours'}</th><th>Details</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No '+kind.toLowerCase()+' requests yet.</div>'}
+  <h3 style="margin-top:18px">Add ${kind} Request</h3>
+  <div class="f-row"><div class="fg"><label>Employee</label><select id="rq_emp">${activeEmps().map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+  <div class="fg"><label>Date</label><input id="rq_date" type="date" value="${todayStr()}"></div></div>
+  <div class="f-row"><div class="fg"><label>${kind==='Expense'?'Amount (₹)':'Hours'}</label><input id="rq_val" type="number" value="${kind==='Expense'?500:2}"></div>
+  <div class="fg"><label>${kind==='Expense'?'Description':'Reason'}</label><input id="rq_desc"></div></div>
+  <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Close</button><button class="btn btn-red" onclick="hrReqAdd('${kind}')">Submit Request</button></div>`);
+}
+function hrReqAdd(kind){
+  const g=x=>document.getElementById('rq_'+x).value;
+  if(kind==='Expense')S.expenses.unshift({id:uid(),empId:g('emp'),date:g('date'),amount:+g('val')||0,desc:g('desc'),status:'Pending'});
+  else S.overtime.unshift({id:uid(),empId:g('emp'),date:g('date'),hours:+g('val')||0,reason:g('desc'),status:'Pending'});
+  save();hrReqModal(kind);render();toast(kind+' request submitted');
+}
+function hrReqAct(kind,id,st){
+  const arr=kind==='Expense'?S.expenses:S.overtime;
+  const r=arr.find(x=>x.id===id);if(r)r.status=st;
+  save();hrReqModal(kind);render();toast(kind+' '+st.toLowerCase());
+}
+function hhTile(ic,lbl,val){return `<div style="border:1px solid var(--border);border-radius:12px;padding:18px;text-align:center"><div style="font-size:30px">${ic}</div><div style="color:var(--blue);font-weight:600;margin:6px 0;font-size:13.5px">${lbl}</div><div style="font-size:30px;font-weight:700;color:var(--navy)">${val}</div></div>`;}
+function hhTeamCard(){
+  const me=S.employees[0];
+  let list=activeEmps();
+  if(hhTeamTab==='imm'&&me)list=list.filter(e=>e.dept===me.dept||e.id===me.id);
+  if(hhTeamSearch)list=list.filter(e=>e.name.toLowerCase().includes(hhTeamSearch.toLowerCase()));
+  const day=S.attendance[hhTeamDate]||{};
+  const cards=list.map(e=>{const a=day[e.id];
+    const badge=a&&a.in?'<span class="badge b-green">Punched-In</span>':a&&a.status==='L'?'<span class="badge b-blue">On Leave</span>':'<span class="badge b-grey">Not Punched-In</span>';
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="avatar" style="width:44px;height:44px">${initials(e.name)}</div>
+        <div style="flex:1;min-width:0"><b>${esc(e.name)}</b> <span style="color:var(--muted)">(${esc(e.code.replace(/^RS/,''))})</span><div style="font-size:12px;color:var(--muted)">${esc(e.desig)}</div></div>
+        <button class="btn btn-sm" style="background:var(--blue);color:#fff;border-radius:16px" onclick="hhViewEmp('${e.id}')">View</button>
+      </div>
+      ${a&&a.in?`<div style="font-size:12px;color:var(--muted);margin-top:8px">🕐 ${fmtDMY(hhTeamDate)} ${a.in}:00 ( IN )${a.out?' — '+a.out+':00 ( OUT )':''}</div>`:''}
+      <div style="margin-top:8px">${badge}</div>
+    </div>`;}).join('');
+  return `<div class="card">
+    <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+      <a class="hr-tab ${hhTeamTab==='imm'?'on':''}" onclick="hhTeamTab='imm';render()">Immediate Team</a>
+      <a class="hr-tab ${hhTeamTab==='my'?'on':''}" onclick="hhTeamTab='my';render()">My Team</a>
+      <input class="search-inp" id="hhTSearch" style="width:130px;border-radius:20px" placeholder="search..." value="${esc(hhTeamSearch)}" oninput="hhTeamSearch=this.value;render();const i=document.getElementById('hhTSearch');i.focus();i.setSelectionRange(99,99)">
+      <input type="date" class="sel" style="border-radius:20px" value="${hhTeamDate}" onchange="hhTeamDate=this.value;render()">
+    </div>
+    <div style="max-height:430px;overflow-y:auto">${cards||'<div class="empty">No team members found.</div>'}</div>
+  </div>`;
+}
+function hhViewEmp(id){
+  const e=emp(id);if(!e)return;
+  const att=monthAttSummary(monthKey()),a=att[e.id]||{present:0};
+  openModal(`<h3>${esc(e.name)}</h3><div class="ps-emp">
+  <div><b>Code:</b> ${esc(e.code)}</div><div><b>Department:</b> ${esc(e.dept)}</div>
+  <div><b>Designation:</b> ${esc(e.desig)}</div><div><b>Shift:</b> ${esc(e.shift||'—')}</div>
+  <div><b>Phone:</b> ${esc(e.phone||'—')}</div><div><b>Email:</b> ${esc(e.email||'—')}</div>
+  <div><b>Joined:</b> ${fmtDate(e.doj)}</div><div><b>This month:</b> ${a.present} / ${att._workDays} days present</div></div>
+  <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Close</button></div>`);
+}
+function hhCalNav(dm){let m=hhCalM+dm,y=hhCalY;if(m<0){m=11;y--;}if(m>11){m=0;y++;}hhCalM=m;hhCalY=y;render();}
+function hhCalCard(){
+  const y=hhCalY,m=hhCalM,me=S.employees[0],tk=todayStr();
+  const startDow=new Date(y,m,1).getDay(),dim=new Date(y,m+1,0).getDate();
+  let cells='';
+  for(let i=0;i<startDow;i++)cells+='<div class="hh-cell" style="border:none"></div>';
+  for(let d=1;d<=dim;d++){
+    const key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const dow=new Date(y,m,d).getDay();
+    let mark='';
+    if(dow===0)mark='<span class="hh-mark" style="background:#2c66d9">WeekOff</span>';
+    else{const a=me?(S.attendance[key]||{})[me.id]:null;
+      if(a){mark=a.status==='P'?'<span class="hh-mark" style="background:var(--green)">P</span>':a.status==='HD'?'<span class="hh-mark" style="background:var(--amber)">HD</span>':a.status==='L'?'<span class="hh-mark" style="background:#7a5fd0">L</span>':'<span class="hh-mark" style="background:var(--red)">A</span>';}
+      else if(key<tk)mark='<span class="hh-mark" style="background:var(--red)">A</span>';}
+    cells+=`<div class="hh-cell ${key===tk?'today':''}"><div class="dn">${d}</div>${mark}</div>`;
+  }
+  return `<div class="card"><h3 style="text-transform:none;font-size:19px;font-family:'DM Serif Display',serif">Calendar</h3>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <button class="btn btn-sm" style="background:#7aa7e8;color:#fff;border-radius:16px;padding:8px 16px" onclick="hhCalY=new Date().getFullYear();hhCalM=new Date().getMonth();render()">Today</button>
+      <b style="font-size:15px">${MONTHS[m]} ${y}</b>
+      <span><button class="btn btn-outline btn-sm" onclick="hhCalNav(-1)">‹</button> <button class="btn btn-sm" style="background:var(--blue);color:#fff" onclick="hhCalNav(1)">›</button></span>
+    </div>
+    <div class="hh-grid">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div style="font-weight:700;font-size:12px;text-align:center;padding:4px">${d}</div>`).join('')}${cells}</div></div>`;
+}
+function hhOccCard(kind){
+  const sel=kind==='bday'?hhBday:hhAnn;
+  const off=sel==='yest'?-1:sel==='tom'?1:0;
+  const d=new Date();d.setDate(d.getDate()+off);
+  const md=String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const list=activeEmps().filter(e=>{const f=kind==='bday'?e.dob:e.doj;return f&&f.slice(5)===md&&(kind==='bday'||+f.slice(0,4)<d.getFullYear());});
+  const items=list.map(e=>`<div style="display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px"><div class="avatar">${initials(e.name)}</div><div><b>${esc(e.name)}</b><div style="font-size:12px;color:var(--muted)">${kind==='bday'?'🎂 Birthday':'🎉 '+(d.getFullYear()-+e.doj.slice(0,4))+' year work anniversary'} — ${esc(e.dept)}</div></div></div>`).join('');
+  const tabs=[['yest','Yesterday'],['today','Today'],['tom','Tommorow']].map(t=>`<a class="hr-tab ${sel===t[0]?'on':''}" style="font-size:13px" onclick="${kind==='bday'?'hhBday':'hhAnn'}='${t[0]}';render()">${t[1]}</a>`).join('');
+  return `<div class="card" style="min-height:250px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px"><div style="display:flex;gap:16px">${tabs}</div><b style="font-size:17px;color:var(--navy)">${kind==='bday'?'Birthdays':'Work Anniversary'}</b></div>${items||'<div class="empty">No '+(kind==='bday'?'birthdays':'work anniversaries')+' '+(sel==='today'?'today':sel==='yest'?'yesterday':'tomorrow')+'.</div>'}</div>`;
+}
+function hhPresent(e,day){const a=day[e.id];return a&&(a.status==='P'||a.status==='HD');}
+function hhShiftCard(){
+  const day=S.attendance[hhShiftDate]||{};
+  const rows=DEPTS.map(dp=>`<tr><td style="white-space:nowrap"><b>${dp}</b></td>${SHIFTS.map(sh=>`<td class="num">${activeEmps().filter(e=>e.dept===dp&&(e.shift||SHIFTS[0])===sh&&hhPresent(e,day)).length}</td>`).join('')}</tr>`).join('');
+  const totals=SHIFTS.map(sh=>activeEmps().filter(e=>(e.shift||SHIFTS[0])===sh&&hhPresent(e,day)).length);
+  return `<div class="card mt"><h3 style="text-transform:none;font-size:19px;font-family:'DM Serif Display',serif">Shift &amp; Department wise Attendance Count</h3>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+    <div class="fg" style="margin:0;width:220px"><label>Select Company *</label><select class="sel" style="width:100%"><option>R S Infotech</option></select></div>
+    <div class="fg" style="margin:0;width:220px"><label>Branch</label><select class="sel" style="width:100%"><option>Choose your option</option><option>Vadodara HO</option></select></div>
+    <div class="fg" style="margin:0;width:180px"><label>Date *</label><input type="date" class="sel" style="width:100%" id="hhShiftDateInp" value="${hhShiftDate}"></div>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:14px">
+    <button class="btn" style="background:var(--blue);color:#fff" onclick="hhShiftDate=document.getElementById('hhShiftDateInp').value||todayStr();render()">Submit</button>
+    <button class="btn btn-red" onclick="hhShiftDate=todayStr();render()">Clear</button>
+    <button class="btn btn-green" onclick="hhShiftCSV()">Export</button>
+  </div>
+  <div class="tbl-scroll"><table class="tbl" style="min-width:1000px"><thead><tr><th></th>${SHIFTS.map(s=>`<th>${s}</th>`).join('')}</tr></thead><tbody>${rows}
+  <tr style="background:var(--light)"><td style="white-space:nowrap"><b>Shift Wise Total</b></td>${totals.map(t=>`<td class="num"><b>${t}</b></td>`).join('')}</tr></tbody></table></div></div>`;
+}
+function hhShiftCSV(){
+  const day=S.attendance[hhShiftDate]||{};
+  let csv='Department,"'+SHIFTS.join('","')+'"\n';
+  DEPTS.forEach(dp=>{csv+=dp+','+SHIFTS.map(sh=>activeEmps().filter(e=>e.dept===dp&&(e.shift||SHIFTS[0])===sh&&hhPresent(e,day)).length).join(',')+'\n';});
+  dlCSV(csv,'shift_attendance_'+hhShiftDate+'.csv');
+}
+function hhVisitsCard(){
+  const rows=S.visits.map(v=>{const e=emp(v.empId);
+    let dur='—';
+    if(v.checkin&&v.checkout){const[a,b]=v.checkin.split(':').map(Number),[c,dd]=v.checkout.split(':').map(Number);const mins=(c*60+dd)-(a*60+b);if(mins>=0)dur=Math.floor(mins/60)+'h '+(mins%60)+'m';}
+    return `<tr><td><b>${esc(e?e.name:'?')}</b></td><td>${esc(v.company)}</td><td>${fmtDMY(v.date)} ${v.time||''}</td><td>${v.checkin||'—'}</td><td>${v.checkout||'—'}</td><td>${dur}</td><td>${v.newCustomer?'<span class="badge b-green">New Customer</span>':''}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="hhVisitDel('${v.id}')">✕</button></td></tr>`;}).join('');
+  return `<div class="card mt"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h3 style="margin:0;text-transform:none;font-size:19px;font-family:'DM Serif Display',serif">Team Visits</h3><button class="btn btn-red btn-sm" onclick="hhVisitForm()">＋ Add Visit</button></div>
+  ${S.visits.length?`<div class="tbl-scroll"><table class="tbl"><thead><tr><th>Assign Person</th><th>Customer Company</th><th>Visit Date-Time</th><th>Check-In</th><th>Check-Out</th><th>Duration</th><th></th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:'<div class="empty">No visits recorded yet — click "Add Visit".</div>'}</div>`;
+}
+function hhVisitForm(){
+  openModal(`<h3>Add Team Visit</h3>
+  <div class="f-row"><div class="fg"><label>Assign Person</label><select id="vs_emp">${activeEmps().map(e=>`<option value="${e.id}">${esc(e.name)}</option>`).join('')}</select></div>
+  <div class="fg"><label>Customer Company</label><input id="vs_co"></div></div>
+  <div class="f-row"><div class="fg"><label>Visit Date</label><input id="vs_date" type="date" value="${todayStr()}"></div><div class="fg"><label>Time</label><input id="vs_time" type="time"></div></div>
+  <div class="f-row"><div class="fg"><label>Check-In</label><input id="vs_in" type="time"></div><div class="fg"><label>Check-Out</label><input id="vs_out" type="time"></div></div>
+  <div class="fg"><label style="display:flex;align-items:center;gap:8px;text-transform:none"><input type="checkbox" id="vs_new" style="width:auto"> New Customer</label></div>
+  <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-red" onclick="hhVisitSave()">Save Visit</button></div>`);
+}
+function hhVisitSave(){
+  const g=x=>document.getElementById('vs_'+x);
+  if(!g('co').value.trim()){toast('Enter customer company');return;}
+  S.visits.unshift({id:uid(),empId:g('emp').value,company:g('co').value.trim(),date:g('date').value,time:g('time').value,checkin:g('in').value,checkout:g('out').value,newCustomer:g('new').checked});
+  save();closeModal();render();toast('Visit added');
+}
+function hhVisitDel(id){if(!confirm('Delete this visit?'))return;S.visits=S.visits.filter(v=>v.id!==id);save();render();}
+function vHrHome(){
+  const totV=S.visits.length,newC=S.visits.filter(v=>v.newCustomer).length,totE=S.expenses.filter(x=>x.status==='Approved').reduce((s,x)=>s+(+x.amount||0),0);
+  return hrTabs('home')
+  +`<h2 style="font-family:'DM Serif Display',serif;font-size:30px;color:var(--navy);margin-bottom:18px">Home</h2>`
+  +hhPunchCard()
+  +`<div class="grid-2 mt" style="align-items:start">
+     <div class="card"><h3 style="text-transform:none;font-size:19px;font-family:'DM Serif Display',serif">Request</h3><div class="grid-3">${hhReqCard('Leave',S.leaves)}${hhReqCard('Expense',S.expenses)}${hhReqCard('OverTime',S.overtime)}</div></div>
+     <div class="card"><h3 style="text-transform:none;font-size:19px;font-family:'DM Serif Display',serif">Visit &amp; Expense</h3><div class="grid-3">${hhTile('🏛️','Total Visit',totV)}${hhTile('🧑‍💼','New Customer',newC)}${hhTile('💰','Total Expense',totE?fmtMoney(totE):0)}</div></div>
+   </div>`
+  +`<div class="grid-2 mt" style="align-items:start">${hhTeamCard()}${hhCalCard()}</div>`
+  +`<div class="grid-2 mt" style="align-items:start">${hhOccCard('bday')}${hhOccCard('ann')}</div>`
+  +hhShiftCard()+hhVisitsCard();
+}
+setInterval(()=>{const el=document.getElementById('hhClock');if(el)el.textContent=new Date().toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit',second:'2-digit'});},1000);
+
+/* ================= HR DASHBOARD ================= */
+let hdTab='dashboard',hdDate=todayStr();
+const HD_TABS=[['dashboard','Dashboard'],['profile','Profile Status'],['expdoc','Expiry Document'],['confirm','To Be Confirm Employees'],['expjoin','Expiry Joining Document'],['assignbio','Assign Biometric Code to User'],['unbio','Un-Assigned Biometric Code'],['shift','Assigned Shift'],['exporg','Expiry Organization Documents']];
+function pieSvg(parts,size,hole){
+  const nz=parts.filter(p=>p.v>0),tot=parts.reduce((s,p)=>s+p.v,0);
+  const r=size/2,cx=r,cy=r;let inner='';
+  if(!tot)inner=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="#eef1f6"/>`;
+  else if(nz.length===1)inner=`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${nz[0].c}"/>`;
+  else{let a0=-Math.PI/2;
+    inner=nz.map(p=>{const a1=a0+p.v/tot*2*Math.PI,large=(a1-a0)>Math.PI?1:0;
+      const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+      const d=`M${cx},${cy} L${x0.toFixed(1)},${y0.toFixed(1)} A${r},${r} 0 ${large} 1 ${x1.toFixed(1)},${y1.toFixed(1)} Z`;a0=a1;
+      return `<path d="${d}" fill="${p.c}"/>`;}).join('');}
+  return `<svg viewBox="0 0 ${size} ${size}" style="width:100%;max-width:220px;display:block;margin:0 auto">${inner}${hole?`<circle cx="${cx}" cy="${cy}" r="${(r*0.62).toFixed(1)}" fill="#fff"/>`:''}</svg>`;
+}
+function hdLeg(c,l,v){return `<span style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;margin-right:14px;line-height:2"><span style="width:12px;height:12px;border-radius:50%;background:${c};display:inline-block"></span>${l} ${v}</span>`;}
+function hdDashboard(){
+  const emps=activeEmps(),day=S.attendance[hdDate]||{};
+  let pin=0,pout=0,leave=0,none=0;
+  emps.forEach(e=>{const a=day[e.id];if(!a||a.status==='A'){none++;return;}if(a.status==='L'){leave++;return;}if(a.out)pout++;else pin++;});
+  const pie=pieSvg([{v:pin,c:'#1a9e5c'},{v:pout,c:'#f5a623'},{v:none,c:'#6b7a92'},{v:leave,c:'#e88fb1'}],220,false);
+  const act=S.employees.filter(e=>e.status==='Active').length,dea=S.employees.length-act;
+  const donut=pieSvg([{v:act,c:'#1a9e5c'},{v:dea,c:'#f4d03f'}],220,true);
+  const bars=[];for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);const k=monthKey(d);const run=S.payrolls[k];bars.push({m:MONTHS[d.getMonth()].slice(0,3),v:run?run.reduce((s,r)=>s+r.net,0):0});}
+  const mx=Math.max(1,...bars.map(b=>b.v));
+  const cols=['#1a9e5c','#e8460a','#f4d03f','#2c66d9','#7a5fd0','#f5a623'];
+  const barSvg=`<svg viewBox="0 0 ${bars.length*70} 210" style="width:100%">${bars.map((b,i)=>{const h=b.v/mx*160,x=i*70+8;
+    return `<rect x="${x}" y="${180-h}" width="54" height="${Math.max(h,1)}" rx="3" fill="${cols[i%6]}"/><text x="${x+27}" y="${196}" font-size="11" text-anchor="middle" fill="#6b7a92">${b.m}</text>${b.v?`<text x="${x+27}" y="${174-h}" font-size="9.5" text-anchor="middle" fill="#1e2a3a">${Math.round(b.v/1000)}k</text>`:''}`;}).join('')}</svg>`;
+  return `<div class="grid-3" style="align-items:start">
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0;text-transform:none;font-size:17px">Punch In &amp; Out</h3><button class="btn btn-sm" style="background:var(--blue);color:#fff;border-radius:14px" onclick="nav('attendance')">View</button></div>
+      <input type="date" class="sel" style="width:100%;margin-bottom:12px" value="${hdDate}" onchange="hdDate=this.value;render()">
+      ${pie}<div style="margin-top:12px">${hdLeg('#1a9e5c','Punch In',pin)}${hdLeg('#f5a623','Punch Out',pout)}${hdLeg('#6b7a92','Not Punch In',none)}${hdLeg('#e88fb1','On Leave',leave)}</div></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0;text-transform:none;font-size:17px">Employee Status</h3><button class="btn btn-sm" style="background:var(--blue);color:#fff;border-radius:14px" onclick="nav('employees')">View</button></div>
+      <div style="position:relative">${donut}<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none"><b style="color:#2c66d9;font-size:13px">Active ${act}</b><span style="font-size:34px;font-weight:700;color:#2c66d9">${act}</span></div></div>
+      <div style="margin-top:12px">${hdLeg('#1a9e5c','Active',act)}${hdLeg('#f4d03f','Deactive',dea)}</div></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0;text-transform:none;font-size:17px">Payroll</h3><span style="font-size:12px;color:var(--muted)">last 6 months · net</span></div>${barSvg}
+      <div style="font-size:11.5px;color:var(--muted);margin-top:8px">Process months from the Payroll page to fill this chart.</div></div>
+  </div>`;
+}
+function hdProfile(){
+  const fields=['name','dept','desig','doj','dob','phone','email','bank'];
+  const rows=S.employees.map(e=>{const f=fields.filter(k=>e[k]&&String(e[k]).trim()).length,pct=Math.round(f/fields.length*100);
+    return `<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td><td style="width:40%"><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div></td><td class="num"><b style="color:${pct===100?'var(--green)':'var(--amber)'}">${pct}%</b></td></tr>`;}).join('');
+  return `<div class="card"><h3>Profile Status</h3><table class="tbl"><thead><tr><th>Employee</th><th>Department</th><th>Profile Completeness</th><th class="num">%</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function hdBio(unassignedOnly){
+  const list=S.employees.filter(e=>!unassignedOnly||!e.bio);
+  const rows=list.map(e=>`<tr><td><b>${esc(e.name)}</b> <span style="color:var(--muted);font-size:11px">${esc(e.code)}</span></td><td>${esc(e.dept)}</td>
+    <td><input placeholder="Biometric code…" value="${esc(e.bio||'')}" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:7px" onchange="hdSetBio('${e.id}',this.value)"></td></tr>`).join('');
+  return `<div class="card"><h3>${unassignedOnly?'Un-Assigned Biometric Code':'Assign Biometric Code to User'}</h3>
+  ${list.length?`<table class="tbl"><thead><tr><th>Employee</th><th>Department</th><th>Biometric Code</th></tr></thead><tbody>${rows}</tbody></table>`:'<div class="empty">Every employee has a biometric code assigned 🎉</div>'}</div>`;
+}
+function hdSetBio(id,v){const e=emp(id);if(e){e.bio=v.trim();save();toast('Biometric code saved');if(hdTab==='unbio')render();}}
+function hdShift(){
+  const rows=S.employees.map(e=>`<tr><td><b>${esc(e.name)}</b></td><td>${esc(e.dept)}</td>
+    <td><select class="sel" onchange="hdSetShift('${e.id}',this.value)">${SHIFTS.map(s=>`<option ${((e.shift||SHIFTS[0])===s)?'selected':''}>${s}</option>`).join('')}</select></td></tr>`).join('');
+  return `<div class="card"><h3>Assigned Shift</h3><table class="tbl"><thead><tr><th>Employee</th><th>Department</th><th>Shift</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function hdSetShift(id,v){const e=emp(id);if(e){e.shift=v;save();toast('Shift updated');}}
+function vHrDash(){
+  const tabs=`<div style="display:flex;gap:22px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1.5px solid var(--border)">${HD_TABS.map(t=>`<a style="cursor:pointer;font-weight:600;font-size:13px;padding:8px 2px;border-bottom:3px solid ${hdTab===t[0]?'var(--blue)':'transparent'};color:${hdTab===t[0]?'var(--blue)':'var(--muted)'}" onclick="hdTab='${t[0]}';render()">${t[1]}</a>`).join('')}</div>`;
+  let body;
+  if(hdTab==='dashboard')body=hdDashboard();
+  else if(hdTab==='profile')body=hdProfile();
+  else if(hdTab==='assignbio')body=hdBio(false);
+  else if(hdTab==='unbio')body=hdBio(true);
+  else if(hdTab==='shift')body=hdShift();
+  else body=`<div class="card"><h3>${HD_TABS.find(t=>t[0]===hdTab)[1]}</h3><div class="empty">No records found.</div></div>`;
+  return hrTabs('dash')+tabs
+  +`<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+     <div class="fg" style="margin:0;width:260px"><label>Select Company</label><select class="sel" style="width:100%"><option>R S Infotech</option></select></div>
+     <button class="btn" style="background:var(--blue);color:#fff;border-radius:22px;padding:12px 24px" onclick="toast('Widget gallery — demo')">Add Widget</button></div>`
+  +body;
+}
 
 /* ================= COMMUNITY APP ================= */
 const CM_CATS=['All','CT','Job','Property','Commerce'];
